@@ -973,38 +973,6 @@
       renderCommentsFeed();
     }
 
-    window.purgeComment = async function(id) {
-
-  const confirmed = confirm(
-    "Hapus komentar ini?"
-  );
-
-  if (!confirmed) return;
-
-  try {
-
-    await deleteDoc(
-      doc(db, "comments", id)
-    );
-
-    pushToast(
-      "Komentar berhasil dihapus",
-      "fa-check-circle"
-    );
-
-    loadComments();
-
-  } catch(err) {
-
-    console.error(err);
-
-    pushToast(
-      "Gagal menghapus komentar",
-      "fa-exclamation-circle"
-    );
-  }
-}
-
     /* ==========================================================================
        SCROLL DRIVEN INTERSECTION OBSERVER REVEAL
        ========================================================================== */
@@ -1096,6 +1064,7 @@ import {
   doc
 }
 from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyDXzsV8M-idC7bDH7use9gA68N0pBNKtAo",
   authDomain: "hilmy-website-b77cc.firebaseapp.com",
@@ -1181,6 +1150,37 @@ async function loadComments() {
 
     feed.appendChild(card);
   });
+}
+ window.purgeComment = async function(id) {
+
+  const confirmed = confirm(
+    "Hapus komentar ini?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+
+    await deleteDoc(
+      doc(db, "comments", id)
+    );
+
+    pushToast(
+      "Komentar berhasil dihapus",
+      "fa-check-circle"
+    );
+
+    loadComments();
+
+  } catch(err) {
+
+    console.error(err);
+
+    pushToast(
+      "Gagal menghapus komentar",
+      "fa-exclamation-circle"
+    );
+  }
 }
 
 loadComments();
