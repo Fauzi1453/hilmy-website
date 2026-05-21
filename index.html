@@ -973,16 +973,37 @@
       renderCommentsFeed();
     }
 
-    function purgeComment(id) {
-      if (confirm("Hapus permanen log komentar ini dari server lokal?")) {
-        commentsFeed = commentsFeed.filter(x => x.id !== id);
-        localLikesLog = localLikesLog.filter(x => x !== id);
-        localStorage.setItem("db_comments_v2", JSON.stringify(commentsFeed));
-        localStorage.setItem("db_user_likes", JSON.stringify(localLikesLog));
-        renderCommentsFeed();
-        pushToast("Komentar telah dihapus admin.");
-      }
-    }
+    window.purgeComment = async function(id) {
+
+  const confirmed = confirm(
+    "Hapus komentar ini?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+
+    await deleteDoc(
+      doc(db, "comments", id)
+    );
+
+    pushToast(
+      "Komentar berhasil dihapus",
+      "fa-check-circle"
+    );
+
+    loadComments();
+
+  } catch(err) {
+
+    console.error(err);
+
+    pushToast(
+      "Gagal menghapus komentar",
+      "fa-exclamation-circle"
+    );
+  }
+}
 
     /* ==========================================================================
        SCROLL DRIVEN INTERSECTION OBSERVER REVEAL
@@ -1070,9 +1091,11 @@ import {
   addDoc,
   getDocs,
   orderBy,
-  query
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+  query,
+  deleteDoc,
+  doc
+}
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDXzsV8M-idC7bDH7use9gA68N0pBNKtAo",
   authDomain: "hilmy-website-b77cc.firebaseapp.com",
@@ -1123,21 +1146,38 @@ async function loadComments() {
 
   const querySnapshot = await getDocs(q);
 
-  querySnapshot.forEach((doc) => {
+  querySnapshot.forEach((firebaseDoc) => {
 
-    const data = doc.data();
+    const data = firebaseDoc.data();
 
     const card = document.createElement("div");
 
     card.className = "comment-node glass";
 
     card.innerHTML = `
-      <div class="node-header">
-        <span class="node-user">${data.user}</span>
-      </div>
+  <div class="node-header">
+    <span class="node-user">${data.user}</span>
+  </div>
 
-      <p class="node-text">${data.text}</p>
-    `;
+  <p class="node-text">${data.text}</p>
+
+  ${
+    IS_OWNER
+    ?
+    `
+    <div class="node-footer">
+      <button
+        class="overlay-btn btn-del"
+        onclick="purgeComment('${firebaseDoc.id}')"
+      >
+        Hapus
+      </button>
+    </div>
+    `
+    :
+    ""
+  }
+`;
 
     feed.appendChild(card);
   });
