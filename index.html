@@ -721,7 +721,7 @@
        BASE64 STORAGE PORTFOLIO GRID HOOKS
        ========================================================================== */
     const galleryGrid = document.getElementById("galleryGrid");
-    let imagesDatabase = JSON.parse(localStorage.getItem("db_gallery_images")) || {};
+    let imagesDatabase = {};
 
     function renderGalleryFramework() {
       galleryGrid.innerHTML = "";
@@ -758,7 +758,7 @@
       document.querySelector(`.art-card[data-id="${id}"] .file-dropzone`).click();
     }
 
-    async function uploadImage(e, slot) {
+   async function uploadImage(e, slot) {
 
   const file = e.target.files[0];
 
@@ -787,11 +787,15 @@
 
     const data = await response.json();
 
+    // simpan ke memori sementara
     imagesDatabase[slot] = data.secure_url;
 
-    localStorage.setItem(
-      "db_gallery_images",
-      JSON.stringify(imagesDatabase)
+    // simpan ke firebase
+    await setDoc(
+      doc(db, "gallery", String(slot)),
+      {
+        image: data.secure_url
+      }
     );
 
     renderGalleryFramework();
@@ -812,15 +816,42 @@
   }
 }
 
-    function deleteSlot(slot) {
-      if (confirm(`Hapus gambar pada slot ${slot}?`)) {
-        delete imagesDatabase[slot];
-        localStorage.setItem("db_gallery_images", JSON.stringify(imagesDatabase));
-        renderGalleryFramework();
-        pushToast("Gambar dihapus dari database lokal");
-      }
-    }
+    async function deleteSlot(slot) {
 
+  if (confirm(`Hapus gambar pada slot ${slot}?`)) {
+
+    delete imagesDatabase[slot];
+
+    await deleteDoc(
+      doc(db, "gallery", String(slot))
+    );
+
+    renderGalleryFramework();
+
+    pushToast(
+      "Gambar berhasil dihapus"
+    );
+  }
+}
+async function loadGallery() {
+
+  imagesDatabase = {};
+
+  for (let i = 0; i < config.slotsCount; i++) {
+
+    const snap = await getDoc(
+      doc(db, "gallery", String(i))
+    );
+
+    if (snap.exists()) {
+
+      imagesDatabase[i] = snap.data().image;
+
+    }
+  }
+
+  renderGalleryFramework();
+}
     /* ==========================================================================
        TYPEWRITER TEXT ROTATION LOGIC
        ========================================================================== */
@@ -888,11 +919,6 @@
     function renderCommentsFeed() {
       const feed = document.getElementById("commentFeedContainer");
       feed.innerHTML = "";
-
-      if (commentsFeed.length === 0) {
-        feed.innerHTML = `<div style="text-align:center; padding:20px; color:var(--muted)">Belum ada pesan. Jadi yang pertama menyapa!</div>`;
-        return;
-      }
 
       commentsFeed.forEach(node => {
         if (node.likes === undefined) node.likes = 0;
@@ -1043,7 +1069,7 @@
       syncCanvasBoundaries();
       renderPointsLoop();
       coreTypeEngine();
-      renderGalleryFramework();
+      loadGallery();
       renderCommentsFeed();
 
       if (IS_OWNER) bootstrapOwnerState();
@@ -1061,7 +1087,9 @@ import {
   orderBy,
   query,
   deleteDoc,
-  doc
+  doc,
+  setDoc,
+  getDoc
 }
 from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -1075,7 +1103,13 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+
+window.db = getFirestore(app);
+
+window.setDoc = setDoc;
+window.doc = doc;
+window.getDoc = getDoc;
+window.deleteDoc = deleteDoc;
 
 window.publishComment = async function () {
 
@@ -1100,6 +1134,7 @@ window.publishComment = async function () {
   msgBox.value = "";
 
   loadComments();
+  loadGallery();
 };
 
 async function loadComments() {
