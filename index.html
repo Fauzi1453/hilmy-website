@@ -250,15 +250,16 @@
     }
 
     /* Hero Avatar Showcase */
-    .hero-display {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
+   .hero-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: translateY(-20px);
+}
     .avatar-wrapper {
       position: relative;
       width: 100%;
-      max-width: 380px;
+      max-width: 280px;
       aspect-ratio: 1;
       border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
       background: linear-gradient(45deg, var(--primary), var(--accent));
@@ -414,6 +415,7 @@
 
     .showcase-desc {
       padding: 24px;
+      margin-top: 32px;
       font-size: 16px;
       line-height: 1.8;
       color: var(--muted);
@@ -609,10 +611,10 @@
         <p id="editableIntro" class="intro-text" contenteditable="false">hi, welcome to my website. im hilmy and this is my personal website where i share my works and social media. enjoy!</p>
         
         <nav class="social-grid" aria-label="Tautan Media Sosial">
-          <a href="https://instagram.com" target="_blank" rel="noopener" class="social-card glass"><i class="fab fa-instagram"></i> Instagram</a>
-          <a href="https://discord.com" target="_blank" rel="noopener" class="social-card glass"><i class="fab fa-discord"></i> Discord</a>
-          <a href="https://spotify.com" target="_blank" rel="noopener" class="social-card glass"><i class="fab fa-spotify"></i> Spotify</a>
-         <a href="https://letterboxd.com" target="_blank" rel="noopener" class="social-card glass"><i class="fas fa-film"></i> Letterboxd</a>
+          <a href="https://www.instagram.com/hilmy.cc/" target="_blank" rel="noopener" class="social-card glass"><i class="fab fa-instagram"></i> Instagram</a>
+          <a href="https://discordapp.com/users/1030053479185653820" target="_blank" rel="noopener" class="social-card glass"><i class="fab fa-discord"></i> Discord</a>
+          <a href="https://open.spotify.com/playlist/7i8Dx2813sBx0G5ekiHAJb?si=fdf760bdb433422f" target="_blank" rel="noopener" class="social-card glass"><i class="fab fa-spotify"></i> Spotify</a>
+         <a href="https://boxd.it/l49AP" target="_blank" rel="noopener" class="social-card glass"><i class="fas fa-film"></i> Letterboxd</a>
         </nav>
       </div>
 
@@ -635,7 +637,14 @@
       <h2 class="section-header-text">Guestbook</h2>
       <div class="guestbook-wrapper">
         <div class="form-box">
-          <input type="text" id="senderName" class="input-field" placeholder="Nama Anda" maxlength="30" required/>
+          <input
+  type="text"
+  id="senderName"
+  class="input-field"
+  placeholder="Nama Anda"
+  maxlength="30"
+  required
+/>
           <textarea id="senderMessage" class="input-field" placeholder="Tulis pesan anda" maxlength="500" required></textarea>
           <button class="submit-btn" onclick="publishComment()">Kirim Pesan</button>
         </div>
@@ -947,7 +956,12 @@ async function loadGallery() {
     function publishComment() {
       const userBox = document.getElementById("senderName");
       const msgBox = document.getElementById("senderMessage");
-      const userVal = userBox.value.trim();
+     const userVal =
+  userBox.value.trim()
+  ||
+  localStorage.getItem(
+    "guest_name"
+  );
       const msgVal = msgBox.value.trim();
       const now = Date.now();
 
@@ -1089,7 +1103,10 @@ import {
   deleteDoc,
   doc,
   setDoc,
-  getDoc
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove
 }
 from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -1103,7 +1120,15 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const DEVICE_ID =
+  localStorage.getItem("device_id")
+  ||
+  crypto.randomUUID();
 
+localStorage.setItem(
+  "device_id",
+  DEVICE_ID
+);
 window.db = getFirestore(app);
 
 window.setDoc = setDoc;
@@ -1117,6 +1142,10 @@ window.publishComment = async function () {
   const msgBox = document.getElementById("senderMessage");
 
   const userVal = userBox.value.trim();
+  localStorage.setItem(
+  "guest_name",
+  userVal
+);
   const msgVal = msgBox.value.trim();
 
   if (!userVal || !msgVal) {
@@ -1124,14 +1153,22 @@ window.publishComment = async function () {
     return;
   }
 
-  await addDoc(collection(db, "comments"), {
-    user: userVal,
-    text: msgVal,
-    timestamp: Date.now()
-  });
+await addDoc(collection(db, "comments"), {
+  user: userVal,
+  text: msgVal,
+  timestamp: Date.now(),
+  likes: 0,
+  likedBy: [],
+  replies: []
+});
 
   userBox.value = "";
   msgBox.value = "";
+
+let likedComments =
+  JSON.parse(
+    localStorage.getItem("liked_comments")
+  ) || [];
 
   loadComments();
   loadGallery();
@@ -1142,6 +1179,11 @@ async function loadComments() {
   const feed = document.getElementById("commentFeedContainer");
 
   feed.innerHTML = "";
+
+  const likedComments =
+  JSON.parse(
+    localStorage.getItem("liked_comments")
+  ) || [];
 
   const q = query(
     collection(db, "comments"),
@@ -1158,31 +1200,115 @@ async function loadComments() {
 
     card.className = "comment-node glass";
 
-    card.innerHTML = `
+   const likes = data.likes || 0;
+   const likedBy =
+  data.likedBy || [];
+
+const isLiked =
+  likedBy.includes(DEVICE_ID);
+
+card.innerHTML = `
   <div class="node-header">
     <span class="node-user">${data.user}</span>
   </div>
 
   <p class="node-text">${data.text}</p>
 
-  ${
-    IS_OWNER
-    ?
-    `
-    <div class="node-footer">
+  <div class="node-footer">
+
+    <button
+  class="heart-btn ${isLiked ? 'liked' : ''}"
+      onclick="likeComment('${firebaseDoc.id}', ${likes})"
+    >
+      <i class="${
+  isLiked
+  ? 'fas'
+  : 'far'
+} fa-heart"></i>
+      <span>${likes}</span>
+    </button>
+
+    <button
+  class="heart-btn"
+  onclick="toggleReplyBox('${firebaseDoc.id}')"
+>
+  <i class="fas fa-reply"></i>
+  Reply
+</button>
+
+    ${
+      IS_OWNER
+      ?
+      `
       <button
         class="overlay-btn btn-del"
         onclick="purgeComment('${firebaseDoc.id}')"
       >
         Hapus
       </button>
-    </div>
-    `
-    :
-    ""
-  }
-`;
+      `
+      :
+      ""
+    }
 
+  </div>
+
+<div
+  id="reply-box-${firebaseDoc.id}"
+  style="
+    display:none;
+    margin-top:15px;
+  "
+>
+
+  <textarea
+    id="reply-text-${firebaseDoc.id}"
+    class="input-field"
+    placeholder="Tulis balasan..."
+    style="min-height:80px;"
+  ></textarea>
+
+  <button
+    class="submit-btn"
+    style="margin-top:10px;"
+    onclick="sendReply('${firebaseDoc.id}')"
+  >
+    Kirim Reply
+  </button>
+
+</div>
+
+<div class="reply-container">
+  ${
+    (data.replies || []).map(reply => `
+      <div
+        style="
+          margin-top:14px;
+          margin-left:20px;
+          padding:14px;
+          border-radius:14px;
+          background:var(--card);
+          border:1px solid var(--border);
+        "
+      >
+        <div
+          style="
+            font-weight:700;
+            color:var(--primary);
+            margin-bottom:6px;
+          "
+        >
+          ${reply.user}
+        </div>
+
+        <div>
+          ${reply.text}
+        </div>
+      </div>
+    `).join("")
+  }
+</div>
+`;
     feed.appendChild(card);
   });
 }
@@ -1218,7 +1344,171 @@ async function loadComments() {
   }
 }
 
+window.likeComment = async function(id, currentLikes) {
+
+  try {
+
+    const ref = doc(
+      db,
+      "comments",
+      id
+    );
+
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+
+    const likedBy =
+      data.likedBy || [];
+
+    const alreadyLiked =
+      likedBy.includes(DEVICE_ID);
+
+    if (alreadyLiked) {
+
+      await updateDoc(ref, {
+
+        likes: Math.max(
+          0,
+          currentLikes - 1
+        ),
+
+        likedBy: arrayRemove(
+          DEVICE_ID
+        )
+      });
+
+      pushToast(
+        "Like dihapus",
+        "fa-heart-crack"
+      );
+
+    } else {
+
+      await updateDoc(ref, {
+
+        likes: currentLikes + 1,
+
+        likedBy: arrayUnion(
+          DEVICE_ID
+        )
+      });
+
+      pushToast(
+        "Komentar disukai",
+        "fa-heart"
+      );
+    }
+
+    loadComments();
+
+  } catch(err) {
+
+    console.error(err);
+
+    pushToast(
+      "Gagal memberi like",
+      "fa-exclamation-circle"
+    );
+  }
+}
+window.toggleReplyBox = function(id) {
+
+  const box =
+    document.getElementById(
+      `reply-box-${id}`
+    );
+
+  if (
+    box.style.display === "none"
+  ) {
+    box.style.display = "block";
+  } else {
+    box.style.display = "none";
+  }
+};
+
+window.sendReply = async function(id) {
+
+  const name =
+  localStorage.getItem(
+    "guest_name"
+  );
+
+  const text =
+    document.getElementById(
+      `reply-text-${id}`
+    ).value.trim();
+
+  if (!name || !text) {
+    pushToast(
+      "Isi semua kolom",
+      "fa-exclamation-circle"
+    );
+    return;
+  }
+
+  try {
+
+    const ref =
+      doc(db, "comments", id);
+
+    const snap =
+      await getDoc(ref);
+
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+
+    const replies =
+      data.replies || [];
+
+    replies.push({
+      user: name,
+      text: text,
+      timestamp: Date.now()
+    });
+
+    await updateDoc(ref, {
+      replies: replies
+    });
+
+    pushToast(
+      "Reply berhasil dikirim",
+      "fa-check-circle"
+    );
+
+    loadComments();
+
+  } catch(err) {
+
+    console.error(err);
+
+    pushToast(
+      "Gagal mengirim reply",
+      "fa-exclamation-circle"
+    );
+  }
+};
 loadComments();
+
+const savedName =
+  localStorage.getItem(
+    "guest_name"
+  );
+
+if (savedName) {
+
+  document.getElementById(
+    "senderName"
+  ).value = savedName;
+
+  document.getElementById(
+    "senderName"
+  ).style.display = "none";
+}
 
 </script>
 </body>
