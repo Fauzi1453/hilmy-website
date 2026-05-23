@@ -429,18 +429,35 @@
     /* ==========================================================================
        GUESTBOOK / FEEDBACK MODULE
        ========================================================================== */
-    .guestbook-wrapper {
-      display: grid;
-      grid-template-columns: 0.9fr 1.1fr;
-      gap: 50px;
-      align-items: start;
-    }
+   /* ==========================================================================
+   GUESTBOOK / FEEDBACK MODULE
+   ========================================================================== */
+.guestbook-wrapper {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 40px;
+  align-items: start;
+}
 
-    .form-box {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
+.form-box {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comment-stack {
+  width: 100%;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  max-height: 550px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
     .input-field {
       width: 100%;
       border: none;
@@ -476,6 +493,9 @@
     .submit-btn:hover { opacity: 0.95; transform: translateY(-1px); }
 
     .comment-stack {
+      width: 100%;
+min-width: 0;
+
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -576,6 +596,13 @@
     flex: 0 0 calc((100% - 20px) / 2);
   }
 }
+@media (max-width: 992px) {
+
+  .guestbook-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+}
   </style>
 </head>
 <body>
@@ -645,9 +672,18 @@
   maxlength="30"
   required
 />
-          <textarea id="senderMessage" class="input-field" placeholder="Tulis pesan anda" maxlength="500" required></textarea>
+          <textarea id="senderMessage" 
+          class="input-field" 
+          placeholder="Tulis pesan anda" 
+          maxlength="500" 
+          required
+          ></textarea>
+
           <div style="display:flex; gap:10px;">
-  <button class="submit-btn" onclick="publishComment()">
+
+  <button 
+  class="submit-btn" 
+  onclick="publishComment()">
     Kirim Pesan
   </button>
 
@@ -659,14 +695,29 @@
   >
     Ganti Nama
   </button>
+
 </div>
-        <div class="comment-stack" id="commentFeedContainer"></div>
+
+</div>
+
+<div
+    class="comment-stack"
+    id="commentFeedContainer"
+  ></div>
+
       </div>
+
     </section>
 
   </main>
 
   <script>
+
+window.db = null;
+window.setDoc = null;
+window.doc = null;
+window.getDoc = null;
+window.deleteDoc = null;
     /* ==========================================================================
        TOAST NOTIFICATION ENGINE
        ========================================================================== */
@@ -776,16 +827,45 @@
     }
 
     function triggerFileInput(id) {
-      document.querySelector(`.art-card[data-id="${id}"] .file-dropzone`).click();
-    }
 
-   async function uploadImage(e, slot) {
+  const input =
+    document.querySelector(
+      `.art-card[data-id="${id}"] .file-dropzone`
+    );
+
+  if (!input) {
+
+    pushToast(
+      "Input upload tidak ditemukan",
+      "fa-exclamation-circle"
+    );
+
+    return;
+  }
+
+  input.click();
+}
+
+  async function uploadImage(e, slot) {
+
+  if (!window.db || !window.setDoc) {
+
+    pushToast(
+      "Firebase belum siap",
+      "fa-exclamation-circle"
+    );
+
+    return;
+  }
 
   const file = e.target.files[0];
 
   if (!file) return;
 
-  pushToast("Uploading image...", "fa-spinner");
+  pushToast(
+    "Uploading image...",
+    "fa-spinner"
+  );
 
   const formData = new FormData();
 
@@ -808,12 +888,24 @@
 
     const data = await response.json();
 
-    // simpan ke memori sementara
-    imagesDatabase[slot] = data.secure_url;
+    console.log(data);
 
-    // simpan ke firebase
-    await setDoc(
-      doc(db, "gallery", String(slot)),
+    if (!data.secure_url) {
+
+      throw new Error(
+        "Upload gagal"
+      );
+    }
+
+    imagesDatabase[slot] =
+      data.secure_url;
+
+    await window.setDoc(
+      window.doc(
+        window.db,
+        "gallery",
+        String(slot)
+      ),
       {
         image: data.secure_url
       }
@@ -826,7 +918,7 @@
       "fa-check-circle"
     );
 
-  } catch (err) {
+  } catch(err) {
 
     console.error(err);
 
@@ -837,20 +929,54 @@
   }
 }
 
-    async function deleteSlot(slot) {
+  async function deleteSlot(slot) {
 
-  if (confirm(`Hapus gambar pada slot ${slot}?`)) {
+  if (
+    !window.db ||
+    !window.deleteDoc
+  ) {
+
+    pushToast(
+      "Firebase belum siap",
+      "fa-exclamation-circle"
+    );
+
+    return;
+  }
+
+  const confirmDelete =
+    confirm(
+      `Hapus gambar pada slot ${slot}?`
+    );
+
+  if (!confirmDelete) return;
+
+  try {
 
     delete imagesDatabase[slot];
 
-    await deleteDoc(
-      doc(db, "gallery", String(slot))
+    await window.deleteDoc(
+      window.doc(
+        window.db,
+        "gallery",
+        String(slot)
+      )
     );
 
     renderGalleryFramework();
 
     pushToast(
-      "Gambar berhasil dihapus"
+      "Gambar berhasil dihapus",
+      "fa-check-circle"
+    );
+
+  } catch(err) {
+
+    console.error(err);
+
+    pushToast(
+      "Gagal menghapus gambar",
+      "fa-exclamation-circle"
     );
   }
 }
@@ -1089,17 +1215,20 @@ async function loadGallery() {
     /* ==========================================================================
        BOOTSTRAP INITIALIZER
        ========================================================================== */
-    document.addEventListener("DOMContentLoaded", () => {
-     
+  document.addEventListener("DOMContentLoaded", () => {
 
-      syncCanvasBoundaries();
-      renderPointsLoop();
-      coreTypeEngine();
-      loadGallery();
-      renderCommentsFeed();
+  syncCanvasBoundaries();
 
-      if (IS_OWNER) bootstrapOwnerState();
-    });
+  renderPointsLoop();
+
+  coreTypeEngine();
+
+  renderCommentsFeed();
+
+  if (IS_OWNER) {
+    bootstrapOwnerState();
+  }
+});
   </script>
 <script type="module">
 
@@ -1626,7 +1755,16 @@ window.deleteReply = async function(commentId, replyIndex) {
   }
 };
 
-loadComments();
+window.addEventListener(
+  "DOMContentLoaded",
+  async () => {
+
+    await loadGallery();
+
+    await loadComments();
+
+  }
+);
 
 const savedName =
   localStorage.getItem(
