@@ -1091,46 +1091,6 @@ async function loadGallery() {
       });
     }
 
-    function publishComment() {
-      const userBox = document.getElementById("senderName");
-      const msgBox = document.getElementById("senderMessage");
-     const userVal =
-  userBox.value.trim()
-  ||
-  localStorage.getItem(
-    "guest_name"
-  );
-      const msgVal = msgBox.value.trim();
-      const now = Date.now();
-
-      if (!userVal || !msgVal) {
-        pushToast("Harap isi semua kolom input!", "fa-exclamation-circle");
-        return;
-      }
-      if (now - spamCooldown < 60000) { // Limit proteksi diperingan menjadi 1 menit demi kenyamanan tes
-        pushToast("Batas waktu interaksi! Mohon tunggu beberapa saat.", "fa-hourglass-half");
-        return;
-      }
-
-      const freshComment = {
-        id: "node_id_" + Date.now() + Math.floor(Math.random() * 100),
-        user: userVal,
-        text: msgVal,
-        timestamp: new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'}),
-        likes: 0
-      };
-
-      commentsFeed.unshift(freshComment);
-      localStorage.setItem("db_comments_v2", JSON.stringify(commentsFeed));
-      localStorage.setItem("db_cooldown_timestamp", now);
-      spamCooldown = now;
-
-      pushToast("Pesan terkirim ke guestbook!", "fa-check-circle");
-      userBox.value = "";
-      msgBox.value = "";
-      renderCommentsFeed();
-    }
-
     function mutateLikeState(id) {
       const idx = commentsFeed.findIndex(x => x.id === id);
       if (idx === -1) return;
@@ -1283,6 +1243,30 @@ window.publishComment = async function () {
   const msgBox = document.getElementById("senderMessage");
 
   const userVal = userBox.value.trim();
+    // BLOK NAMA KHUSUS OWNER
+  const blockedNames = [
+    "hilmy",
+    "hilmy.",
+    "hilmy.cc",
+    "fyiza",
+    "fyizaa"
+  ];
+
+  if (
+    blockedNames.includes(
+      userVal.toLowerCase()
+    ) &&
+    !IS_OWNER
+  ) {
+
+    pushToast(
+      "Nama tersebut khusus owner",
+      "fa-lock"
+    );
+
+    return;
+  }
+
   localStorage.setItem(
   "guest_name",
   userVal
