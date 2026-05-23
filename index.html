@@ -646,8 +646,20 @@
   required
 />
           <textarea id="senderMessage" class="input-field" placeholder="Tulis pesan anda" maxlength="500" required></textarea>
-          <button class="submit-btn" onclick="publishComment()">Kirim Pesan</button>
-        </div>
+          <div style="display:flex; gap:10px;">
+  <button class="submit-btn" onclick="publishComment()">
+    Kirim Pesan
+  </button>
+
+  <button
+    class="submit-btn"
+    type="button"
+    onclick="changeUsername()"
+    style="background:#374151;"
+  >
+    Ganti Nama
+  </button>
+</div>
         <div class="comment-stack" id="commentFeedContainer"></div>
       </div>
     </section>
@@ -1159,7 +1171,7 @@ await addDoc(collection(db, "comments"), {
   timestamp: Date.now(),
   likes: 0,
   likedBy: [],
-  replies: []
+  deviceId: DEVICE_ID
 });
 
   userBox.value = "";
@@ -1207,6 +1219,9 @@ async function loadComments() {
 const isLiked =
   likedBy.includes(DEVICE_ID);
 
+const isOwnComment =
+  data.deviceId === DEVICE_ID;
+
 card.innerHTML = `
   <div class="node-header">
     <span class="node-user">${data.user}</span>
@@ -1237,19 +1252,19 @@ card.innerHTML = `
 </button>
 
     ${
-      IS_OWNER
-      ?
-      `
-      <button
-        class="overlay-btn btn-del"
-        onclick="purgeComment('${firebaseDoc.id}')"
-      >
-        Hapus
-      </button>
-      `
-      :
-      ""
-    }
+  IS_OWNER || isOwnComment
+  ?
+  `
+  <button
+    class="overlay-btn btn-del"
+    onclick="purgeComment('${firebaseDoc.id}')"
+  >
+    Hapus
+  </button>
+  `
+  :
+  ""
+}
 
   </div>
 
@@ -1280,35 +1295,78 @@ card.innerHTML = `
 
 <div class="reply-container">
   ${
-    (data.replies || []).map(reply => `
-      <div
-        style="
-          margin-top:14px;
-          margin-left:20px;
-          padding:14px;
-          border-radius:14px;
-          background:var(--card);
-          border:1px solid var(--border);
-        "
-      >
+    (data.replies || []).map((reply, index) => {
+
+      const canDeleteReply =
+        IS_OWNER ||
+        reply.deviceId === DEVICE_ID;
+
+      return `
         <div
           style="
-            font-weight:700;
-            color:var(--primary);
-            margin-bottom:6px;
+            margin-top:14px;
+            margin-left:20px;
+            padding:14px;
+            border-radius:14px;
+            background:var(--card);
+            border:1px solid var(--border);
           "
         >
-          ${reply.user}
-        </div>
 
-        <div>
-          ${reply.text}
+          <div
+            style="
+              display:flex;
+              justify-content:space-between;
+              align-items:center;
+              gap:10px;
+              margin-bottom:6px;
+            "
+          >
+
+            <div
+              style="
+                font-weight:700;
+                color:var(--primary);
+              "
+            >
+              ${reply.user}
+            </div>
+
+            ${
+              canDeleteReply
+              ?
+              `
+              <button
+                class="overlay-btn btn-del"
+                style="
+                  padding:6px 10px;
+                  font-size:12px;
+                "
+                onclick="deleteReply(
+                  '${firebaseDoc.id}',
+                  ${index}
+                )"
+              >
+                Hapus
+              </button>
+              `
+              :
+              ""
+            }
+
+          </div>
+
+          <div>
+            ${reply.text}
+          </div>
+
         </div>
-      </div>
-    `).join("")
+      `;
+    }).join("")
   }
 </div>
 `;
+
     feed.appendChild(card);
   });
 }
@@ -1414,6 +1472,17 @@ window.likeComment = async function(id, currentLikes) {
     );
   }
 }
+window.changeUsername = function () {
+
+  localStorage.removeItem("guest_name");
+
+  document.getElementById("senderName").value = "";
+
+  pushToast(
+    "Nama berhasil direset",
+    "fa-user"
+  );
+}
 window.toggleReplyBox = function(id) {
 
   const box =
@@ -1466,10 +1535,11 @@ window.sendReply = async function(id) {
       data.replies || [];
 
     replies.push({
-      user: name,
-      text: text,
-      timestamp: Date.now()
-    });
+  user: name,
+  text: text,
+  timestamp: Date.now(),
+  deviceId: DEVICE_ID
+});
 
     await updateDoc(ref, {
       replies: replies
@@ -1492,6 +1562,70 @@ window.sendReply = async function(id) {
     );
   }
 };
+window.deleteReply = async function(commentId, replyIndex) {
+
+  const confirmed = confirm(
+    "Hapus reply ini?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+
+    const ref =
+      doc(db, "comments", commentId);
+
+    const snap =
+      await getDoc(ref);
+
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+
+    const replies =
+      data.replies || [];
+
+    const targetReply =
+      replies[replyIndex];
+
+    const allowed =
+      IS_OWNER ||
+      targetReply.deviceId === DEVICE_ID;
+
+    if (!allowed) {
+
+      pushToast(
+        "Tidak memiliki akses",
+        "fa-ban"
+      );
+
+      return;
+    }
+
+    replies.splice(replyIndex, 1);
+
+    await updateDoc(ref, {
+      replies: replies
+    });
+
+    pushToast(
+      "Reply berhasil dihapus",
+      "fa-check-circle"
+    );
+
+    loadComments();
+
+  } catch(err) {
+
+    console.error(err);
+
+    pushToast(
+      "Gagal menghapus reply",
+      "fa-exclamation-circle"
+    );
+  }
+};
+
 loadComments();
 
 const savedName =
